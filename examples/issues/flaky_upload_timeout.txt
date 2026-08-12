@@ -1,0 +1,7 @@
+Large file upload fails with a timeout error after the second retry.
+
+Steps to reproduce: pick any file over 10 MB, start an upload on a slow
+connection, and watch the request fail. The traceback points at the retry
+wrapper but the same file uploads fine on the first attempt.
+
+We should add a regression test so this does not come back.

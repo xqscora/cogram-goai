@@ -1,0 +1,4 @@
+The dashboard is slow for accounts with a lot of history. Loading the events
+page takes over 12 seconds and sometimes hits the gateway timeout.
+
+No error is raised, it is purely a performance problem.

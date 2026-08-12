@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cogram-goai"
+version = "0.1.0"
+description = "A minimal, dependency-free multi-agent pipeline with a shared keyword memory skill (GOAI 2026 Agent Infra educational slice)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Cora Zeng" }]
+keywords = ["multi-agent", "agent-infra", "memory", "skill", "goai"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Libraries",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/xqscora/cogram-goai"
+
+[project.scripts]
+cogram-goai = "cogram_goai.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+cogram_goai = ["py.typed"]

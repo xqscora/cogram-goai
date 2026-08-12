@@ -1,0 +1,110 @@
+"""The closed loop: decompose, recall, verify, gate on a human, capture."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Mapping, Optional
+
+from cogram_goai.agents.memory import KeywordMemoryAgent
+from cogram_goai.agents.triage import Subtask, TriageClerk
+from cogram_goai.agents.verifier import ChecklistItem, ChecklistVerifier
+from cogram_goai.notes import NoteStore
+from cogram_goai.trace import Trace
+
+#: An approval callback receives the result-so-far and returns True to merge.
+ApprovalFn = Callable[["PipelineResult"], bool]
+
+PIPELINE_AGENT = "pipeline"
+
+
+def approve_always(_: "PipelineResult") -> bool:
+    return True
+
+
+def approve_never(_: "PipelineResult") -> bool:
+    return False
+
+
+@dataclass
+class PipelineResult:
+    issue_text: str
+    subtasks: List[Subtask] = field(default_factory=list)
+    recall: Dict[str, Any] = field(default_factory=dict)
+    checklist: List[ChecklistItem] = field(default_factory=list)
+    verified: bool = False
+    approved: Optional[bool] = None
+    captured_note_id: Optional[str] = None
+    trace: Optional[Trace] = None
+
+    @property
+    def run_id(self) -> str:
+        return self.trace.run_id if self.trace else ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "run_id": self.run_id,
+            "issue_text": self.issue_text,
+            "subtasks": [task.to_dict() for task in self.subtasks],
+            "recall": self.recall,
+            "checklist": [item.to_dict() for item in self.checklist],
+            "verified": self.verified,
+            "approved": self.approved,
+            "captured_note_id": self.captured_note_id,
+        }
+
+
+def run_pipeline(
+    issue_text: str,
+    store: NoteStore,
+    trace: Optional[Trace] = None,
+    evidence: Optional[Mapping[str, str]] = None,
+    approve: Optional[ApprovalFn] = None,
+    max_notes: int = 3,
+    capture: bool = True,
+    capture_tags: Optional[List[str]] = None,
+) -> PipelineResult:
+    """Run one issue through the three agents.
+
+    ``approve`` is required for anything to be written back. Leaving it as
+    ``None`` means the run stops at the gate with ``approved=None``, which is
+    what a headless CI run should see.
+    """
+    trace = trace or Trace()
+    result = PipelineResult(issue_text=issue_text, trace=trace)
+
+    trace.record(PIPELINE_AGENT, "task_input", chars=len(issue_text), notes_in_store=len(store))
+
+    result.subtasks = TriageClerk().run(issue_text, trace=trace)
+
+    memory = KeywordMemoryAgent(store)
+    result.recall = memory.recall(issue_text, max_notes=max_notes, trace=trace)
+
+    result.checklist = ChecklistVerifier().run(result.subtasks, evidence=evidence, trace=trace)
+    result.verified = ChecklistVerifier.all_passed(result.checklist)
+
+    if not result.verified:
+        trace.record(PIPELINE_AGENT, "gate_skipped", reason="checklist_incomplete")
+        return result
+
+    if approve is None:
+        trace.record(PIPELINE_AGENT, "gate_pending", reason="no_approver")
+        return result
+
+    result.approved = bool(approve(result))
+    trace.record(PIPELINE_AGENT, "human_approval", approved=result.approved)
+
+    if result.approved and capture:
+        note = memory.capture(
+            _capture_text(result),
+            tags=capture_tags or result.recall.get("matched_tags", []),
+            trace=trace,
+        )
+        result.captured_note_id = note.id
+
+    return result
+
+
+def _capture_text(result: PipelineResult) -> str:
+    kinds = ", ".join(task.kind for task in result.subtasks)
+    head = " ".join(result.issue_text.split())[:120]
+    return "Resolved: %s | subtasks: %s" % (head, kinds)

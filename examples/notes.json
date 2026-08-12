@@ -1,0 +1,37 @@
+[
+  {
+    "id": "note-001",
+    "text": "Uploads over 8 MB time out because the retry wrapper reuses an already-consumed stream. Rewind before each retry.",
+    "tags": ["upload", "timeout", "retry"]
+  },
+  {
+    "id": "note-002",
+    "text": "The uploader lives in services/uploader.py; the retry decorator is in common/retry.py, not in the HTTP layer.",
+    "tags": ["upload", "retry", "routing"]
+  },
+  {
+    "id": "note-003",
+    "text": "Regression tests for upload paths need a fixture larger than the 8 MB chunk size, otherwise the bug never triggers.",
+    "tags": ["upload", "test", "fixture"]
+  },
+  {
+    "id": "note-004",
+    "text": "Login 500s last month were caused by an expired signing key, not by the auth code. Check key rotation first.",
+    "tags": ["login", "auth", "error"]
+  },
+  {
+    "id": "note-005",
+    "text": "Slow dashboard queries came from a missing index on events(user_id, created_at).",
+    "tags": ["performance", "slow", "database"]
+  },
+  {
+    "id": "note-006",
+    "text": "The docs build fails on Windows when a README contains a bare CRLF inside a code fence.",
+    "tags": ["docs", "readme", "windows"]
+  },
+  {
+    "id": "note-007",
+    "text": "中文 issue 里出现「超时」时，先看重试逻辑，再看网络层。",
+    "tags": ["timeout", "retry"]
+  }
+]
