@@ -45,3 +45,18 @@ class Trace:
 
     def as_jsonl(self) -> str:
         return "\n".join(json.dumps(entry, ensure_ascii=False) for entry in self.events)
+
+    @classmethod
+    def load(cls, path: str) -> "Trace":
+        """Reconstruct a trace from a JSONL file (replay / audit)."""
+        events: List[Dict[str, Any]] = []
+        with open(path, "r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                events.append(json.loads(line))
+        run_id = events[0]["run_id"] if events else None
+        trace = cls(run_id=run_id)
+        trace.events = events
+        return trace

@@ -27,7 +27,7 @@ class KeywordMemoryAgent:
     ) -> Dict[str, Any]:
         result = keyword_recall(
             issue_text,
-            notes=list(self.store),
+            notes=self.store.active(),
             max_notes=max_notes,
             min_score=min_score,
         )
@@ -39,6 +39,7 @@ class KeywordMemoryAgent:
                 hits=len(result["notes"]),
                 note_ids=[note["id"] for note in result["notes"]],
                 matched_tags=result["matched_tags"],
+                bands=[note.get("band") for note in result["notes"]],
                 fallback=result["fallback"],
             )
         return result
@@ -48,8 +49,10 @@ class KeywordMemoryAgent:
         text: str,
         tags: Iterable[str] = (),
         trace: Optional[Any] = None,
+        cause: str = "",
+        fix: str = "",
     ) -> Note:
-        note = self.store.append(text, tags)
+        note = self.store.append(text, tags, cause=cause, fix=fix)
         if self.store.path:
             self.store.save()
         if trace is not None:
@@ -62,10 +65,42 @@ class KeywordMemoryAgent:
             )
         return note
 
+    def rollback(self, note_id: str, trace: Optional[Any] = None) -> Note:
+        note = self.store.rollback(note_id)
+        if self.store.path:
+            self.store.save()
+        if trace is not None:
+            trace.record(self.name, "rollback", note_id=note.id)
+        return note
+
+    def context_packet(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """Bounded, cited context for the next agent. Never a bare dump."""
+        notes = result.get("notes") or []
+        return {
+            "citations": [
+                {
+                    "id": note["id"],
+                    "band": note.get("band", "unknown"),
+                    "reason": note.get("reason", ""),
+                    "text": note["text"],
+                    "cause": note.get("cause") or "",
+                    "fix": note.get("fix") or "",
+                }
+                for note in notes
+            ],
+            "fallback": result.get("fallback"),
+            "auto_inject": [note["id"] for note in notes if note.get("band") == "high"],
+        }
+
     def context_lines(self, result: Dict[str, Any]) -> List[str]:
         if not result["notes"]:
             return ["(no prior note matched; fallback=%s)" % result["fallback"]]
         return [
-            "[%s | score %.1f] %s" % (note["id"], note["score"], note["text"])
+            "[%s | %s | score %.1f] %s" % (
+                note["id"],
+                note.get("band", "?"),
+                note["score"],
+                note["text"],
+            )
             for note in result["notes"]
         ]

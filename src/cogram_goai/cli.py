@@ -10,8 +10,14 @@ from typing import List, Optional
 
 from cogram_goai import __version__
 from cogram_goai.notes import NoteStore
-from cogram_goai.pipeline import PipelineResult, approve_always, approve_never, run_pipeline
-from cogram_goai.skill import SKILL_CONTRACT, keyword_recall
+from cogram_goai.pipeline import (
+    PipelineResult,
+    approve_always,
+    approve_never,
+    rollback_capture,
+    run_pipeline,
+)
+from cogram_goai.skill import SKILL_CATALOG, SKILL_CONTRACT, keyword_recall
 from cogram_goai.trace import Trace
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -43,10 +49,16 @@ def _print_result(result: PipelineResult) -> None:
     hits = result.recall.get("notes", [])
     print("\n[A2 memory] %d recalled note(s)" % len(hits))
     for note in hits:
-        print("  - %s score=%.1f :: %s" % (note["id"], note["score"], note["text"]))
+        print(
+            "  - %s score=%.1f band=%s :: %s"
+            % (note["id"], note["score"], note.get("band", "?"), note["text"])
+        )
         print("      matched: %s" % (", ".join(note["matched"]) or "-"))
     if result.recall.get("fallback"):
         print("  fallback: %s" % result.recall["fallback"])
+    auto = result.context.get("auto_inject") or []
+    if auto:
+        print("  auto-inject (high band): %s" % ", ".join(auto))
 
     print("\n[A3 verifier] %s" % ("all items passed" if result.verified else "incomplete"))
     for item in result.checklist:
@@ -119,6 +131,34 @@ def _cmd_contract(_: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_tools(_: argparse.Namespace) -> int:
+    print(json.dumps(SKILL_CATALOG, ensure_ascii=False, indent=2))
+    return 0
+
+
+def _cmd_rollback(args: argparse.Namespace) -> int:
+    store = _load_store(args.notes)
+    trace = Trace(path=args.trace)
+    note = rollback_capture(store, args.note_id, trace=trace)
+    print("rolled back %s (status=%s)" % (note.id, note.status))
+    return 0
+
+
+def _cmd_replay(args: argparse.Namespace) -> int:
+    trace = Trace.load(args.trace)
+    print("run_id: %s" % trace.run_id)
+    print("%d event(s)" % len(trace.events))
+    for entry in trace.events:
+        extra = ""
+        payload = entry.get("payload") or {}
+        if "note_id" in payload:
+            extra = " note_id=%s" % payload["note_id"]
+        elif "hits" in payload:
+            extra = " hits=%s" % payload["hits"]
+        print("  %s  %s.%s%s" % (entry.get("ts", ""), entry["agent"], entry["event"], extra))
+    return 0
+
+
 def _cmd_notes(args: argparse.Namespace) -> int:
     store = _load_store(args.notes)
     if args.add:
@@ -127,7 +167,12 @@ def _cmd_notes(args: argparse.Namespace) -> int:
         print("added %s" % note.id)
         return 0
     for note in store:
-        print("%-22s %-28s %s" % (note.id, ",".join(note.tags) or "-", note.text))
+        print("%-22s %-10s %-28s %s" % (
+            note.id,
+            note.status,
+            ",".join(note.tags) or "-",
+            note.text,
+        ))
     print("\n%d note(s) in %s" % (len(store), store.path))
     return 0
 
@@ -177,14 +222,27 @@ def build_parser() -> argparse.ArgumentParser:
     skill.add_argument("--max-notes", type=int, default=3)
     skill.set_defaults(func=_cmd_skill)
 
-    contract = sub.add_parser("contract", help="print the skill contract as JSON")
+    contract = sub.add_parser("contract", help="print the keyword_recall skill contract as JSON")
     contract.set_defaults(func=_cmd_contract)
+
+    tools = sub.add_parser("tools", help="print every skill contract (MCP-shaped catalog)")
+    tools.set_defaults(func=_cmd_tools)
 
     notes = sub.add_parser("notes", help="list or append notes")
     notes.add_argument("--notes", default=DEFAULT_NOTES)
     notes.add_argument("--add", help="append a note with this text")
     notes.add_argument("--tag", action="append", help="tag for the appended note (repeatable)")
     notes.set_defaults(func=_cmd_notes)
+
+    rollback = sub.add_parser("rollback", help="mark a captured note rolled back (row stays for audit)")
+    rollback.add_argument("--notes", default=DEFAULT_NOTES)
+    rollback.add_argument("--note-id", required=True)
+    rollback.add_argument("--trace", help="append a rollback event to this JSONL file")
+    rollback.set_defaults(func=_cmd_rollback)
+
+    replay = sub.add_parser("replay", help="print a saved JSONL trace")
+    replay.add_argument("--trace", required=True, help="path to a JSONL trace written by a previous run")
+    replay.set_defaults(func=_cmd_replay)
 
     return parser
 

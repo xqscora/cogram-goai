@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, List, Mapping, Optional
 from cogram_goai.agents.memory import KeywordMemoryAgent
 from cogram_goai.agents.triage import Subtask, TriageClerk
 from cogram_goai.agents.verifier import ChecklistItem, ChecklistVerifier
-from cogram_goai.notes import NoteStore
+from cogram_goai.notes import Note, NoteStore
 from cogram_goai.trace import Trace
 
 #: An approval callback receives the result-so-far and returns True to merge.
@@ -30,6 +30,7 @@ class PipelineResult:
     issue_text: str
     subtasks: List[Subtask] = field(default_factory=list)
     recall: Dict[str, Any] = field(default_factory=dict)
+    context: Dict[str, Any] = field(default_factory=dict)
     checklist: List[ChecklistItem] = field(default_factory=list)
     verified: bool = False
     approved: Optional[bool] = None
@@ -46,6 +47,7 @@ class PipelineResult:
             "issue_text": self.issue_text,
             "subtasks": [task.to_dict() for task in self.subtasks],
             "recall": self.recall,
+            "context": self.context,
             "checklist": [item.to_dict() for item in self.checklist],
             "verified": self.verified,
             "approved": self.approved,
@@ -72,12 +74,20 @@ def run_pipeline(
     trace = trace or Trace()
     result = PipelineResult(issue_text=issue_text, trace=trace)
 
-    trace.record(PIPELINE_AGENT, "task_input", chars=len(issue_text), notes_in_store=len(store))
+    trace.record(PIPELINE_AGENT, "task_input", chars=len(issue_text), notes_in_store=len(store.active()))
 
     result.subtasks = TriageClerk().run(issue_text, trace=trace)
 
     memory = KeywordMemoryAgent(store)
     result.recall = memory.recall(issue_text, max_notes=max_notes, trace=trace)
+    result.context = memory.context_packet(result.recall)
+    trace.record(
+        PIPELINE_AGENT,
+        "context_packet",
+        citations=[item["id"] for item in result.context.get("citations", [])],
+        auto_inject=result.context.get("auto_inject", []),
+        fallback=result.context.get("fallback"),
+    )
 
     result.checklist = ChecklistVerifier().run(result.subtasks, evidence=evidence, trace=trace)
     result.verified = ChecklistVerifier.all_passed(result.checklist)
@@ -94,14 +104,35 @@ def run_pipeline(
     trace.record(PIPELINE_AGENT, "human_approval", approved=result.approved)
 
     if result.approved and capture:
+        cause, fix = _cause_fix_from_context(result.context)
         note = memory.capture(
             _capture_text(result),
             tags=capture_tags or result.recall.get("matched_tags", []),
             trace=trace,
+            cause=cause,
+            fix=fix,
         )
         result.captured_note_id = note.id
 
     return result
+
+
+def rollback_capture(store: NoteStore, note_id: str, trace: Optional[Trace] = None) -> Note:
+    """Undo a capture without deleting the audit row."""
+    trace = trace or Trace()
+    note = KeywordMemoryAgent(store).rollback(note_id, trace=trace)
+    trace.record(PIPELINE_AGENT, "rollback", note_id=note.id)
+    return note
+
+
+def _cause_fix_from_context(context: Mapping[str, Any]) -> tuple[str, str]:
+    for item in context.get("citations") or []:
+        if item.get("band") == "high":
+            return str(item.get("cause") or ""), str(item.get("fix") or "")
+    for item in context.get("citations") or []:
+        if item.get("cause") or item.get("fix"):
+            return str(item.get("cause") or ""), str(item.get("fix") or "")
+    return "", ""
 
 
 def _capture_text(result: PipelineResult) -> str:

@@ -1,4 +1,9 @@
-"""Plain-JSON note store used as the shared scratchpad between agents."""
+"""Plain-JSON note store used as the shared scratchpad between agents.
+
+Notes are append-only. A rollback does not delete the row — it marks
+``status: rolled_back`` so the audit trail still contains the rejected
+capture. Recall skips rolled-back notes.
+"""
 
 from __future__ import annotations
 
@@ -15,6 +20,9 @@ from cogram_goai.tokenize import normalize_tags
 #: skill into an exfiltration tool.
 FORBIDDEN_PATH_PARTS = (".env", "secret", "credential", "password", "token", "id_rsa", ".pem")
 
+STATUS_ACTIVE = "active"
+STATUS_ROLLED_BACK = "rolled_back"
+
 
 class NoteStoreError(RuntimeError):
     pass
@@ -25,6 +33,9 @@ class Note:
     id: str
     text: str
     tags: List[str] = field(default_factory=list)
+    cause: str = ""
+    fix: str = ""
+    status: str = STATUS_ACTIVE
 
     @classmethod
     def from_dict(cls, raw: Dict[str, Any]) -> "Note":
@@ -33,14 +44,30 @@ class Note:
         text = str(raw.get("text", "")).strip()
         if not text:
             raise NoteStoreError("note %r has no text" % raw.get("id"))
+        status = str(raw.get("status") or STATUS_ACTIVE)
+        if status not in {STATUS_ACTIVE, STATUS_ROLLED_BACK}:
+            status = STATUS_ACTIVE
         return cls(
             id=str(raw.get("id") or "note-%s" % abs(hash(text)) % 10**6),
             text=text,
             tags=normalize_tags(raw.get("tags") or []),
+            cause=str(raw.get("cause") or "").strip(),
+            fix=str(raw.get("fix") or "").strip(),
+            status=status,
         )
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"id": self.id, "text": self.text, "tags": list(self.tags)}
+        payload: Dict[str, Any] = {
+            "id": self.id,
+            "text": self.text,
+            "tags": list(self.tags),
+            "status": self.status,
+        }
+        if self.cause:
+            payload["cause"] = self.cause
+        if self.fix:
+            payload["fix"] = self.fix
+        return payload
 
 
 def _assert_safe_path(path: str) -> None:
@@ -51,7 +78,7 @@ def _assert_safe_path(path: str) -> None:
 
 
 class NoteStore:
-    """Loads, queries and appends notes stored as a JSON list."""
+    """Loads, queries, appends and rolls back notes stored as a JSON list."""
 
     def __init__(self, notes: Optional[Iterable[Note]] = None, path: Optional[str] = None) -> None:
         self.path = path
@@ -84,7 +111,14 @@ class NoteStore:
         self.path = target
         return target
 
-    def append(self, text: str, tags: Iterable[str] = (), note_id: Optional[str] = None) -> Note:
+    def append(
+        self,
+        text: str,
+        tags: Iterable[str] = (),
+        note_id: Optional[str] = None,
+        cause: str = "",
+        fix: str = "",
+    ) -> Note:
         text = text.strip()
         if not text:
             raise NoteStoreError("cannot append an empty note")
@@ -92,9 +126,24 @@ class NoteStore:
             id=note_id or "note-%s-%03d" % (time.strftime("%Y%m%d"), len(self.notes) + 1),
             text=text,
             tags=normalize_tags(tags),
+            cause=cause.strip(),
+            fix=fix.strip(),
         )
         self.notes.append(note)
         return note
+
+    def rollback(self, note_id: str) -> Note:
+        """Mark a note rolled back. The row stays so the audit trail is intact."""
+        for note in self.notes:
+            if note.id == note_id:
+                if note.status == STATUS_ROLLED_BACK:
+                    raise NoteStoreError("note %s is already rolled back" % note_id)
+                note.status = STATUS_ROLLED_BACK
+                return note
+        raise NoteStoreError("note %s not found" % note_id)
+
+    def active(self) -> List[Note]:
+        return [note for note in self.notes if note.status == STATUS_ACTIVE]
 
     def __len__(self) -> int:
         return len(self.notes)

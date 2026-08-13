@@ -5,7 +5,7 @@ Print the machine-readable version at any time with `cogram-goai contract`.
 | Field | Value |
 |---|---|
 | **Name** | `cogram.keyword_recall` |
-| **Version** | 0.1.0 |
+| **Version** | 0.2.0 |
 | **Purpose** | Recall up to N previously captured notes whose keywords overlap the issue text |
 | **Invocation point** | After triage, before any patch is written |
 | **Dependent tools** | Local file read/write, or an equivalent MCP file tool |
@@ -39,12 +39,17 @@ Print the machine-readable version at any time with `cogram-goai contract`.
       "text": "Uploads over 8 MB time out because the retry wrapper reuses a consumed stream.",
       "tags": ["upload", "timeout", "retry"],
       "score": 11.0,
+      "band": "high",
+      "reason": "direct_structured_cue",
       "matched": ["mb", "over", "retry", "uploads", "wrapper"],
-      "matched_tags": ["retry", "upload"]
+      "matched_tags": ["retry", "upload"],
+      "cause": "retry wrapper reuses a consumed stream",
+      "fix": "buffer the body before the first attempt"
     }
   ],
   "matched_tags": ["retry", "upload"],
   "query_tokens": ["large", "retry", "time", "timeout", "uploads"],
+  "expanded_tokens": ["large", "retry", "time", "timeout", "uploads", "超时"],
   "fallback": null
 }
 ```
@@ -62,6 +67,13 @@ score(note) = 1.0 × |query_tokens ∩ note_body_tokens|
 Sorted by descending score, ties broken by note id so runs are reproducible.
 Tags are worth double because they are curated by a human at capture time,
 whereas body tokens are incidental.
+
+**Query-side synonym expansion** (not note-side): tokens in the issue are
+expanded through `aliases.py` (`timeout` ↔ `超时`, `retry` ↔ `重试`, …)
+before overlap is computed. Notes are scored against the expanded query
+set; their own text is not rewritten. Hits also carry an evidence `band`:
+`high` if a curated tag overlapped, else `medium`. Only `high` is
+auto-injected into the next agent. Notes with `status != active` are skipped.
 
 ## Tokenization
 
