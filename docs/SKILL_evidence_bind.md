@@ -5,7 +5,7 @@ Print the machine-readable catalog with `cogram-goai tools`.
 | Field | Value |
 |---|---|
 | **Name** | `cogram.evidence_bind` |
-| **Version** | 0.2.0 |
+| **Version** | 0.3.0 |
 | **Purpose** | Bind each subtask to a non-empty evidence string; fail items that have none |
 | **Invocation point** | After memory recall, before the human gate |
 | **Dependent tools** | None (pure function) |

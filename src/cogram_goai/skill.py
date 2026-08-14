@@ -1,4 +1,4 @@
-"""Skills: ``cogram.keyword_recall`` and ``cogram.evidence_bind``.
+"""Skills: recall, evidence bind, redact, approval gate, path guard.
 
 ``keyword_recall`` returns previously captured notes whose keywords overlap
 the issue text. Scoring is token overlap plus an audited synonym table
@@ -20,8 +20,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
+import re
+
 from cogram_goai.aliases import expand_tokens
-from cogram_goai.notes import Note, NoteStore
+from cogram_goai.notes import Note, NoteStore, NoteStoreError, _assert_safe_path
 from cogram_goai.tokenize import token_set
 
 SKILL_NAME = "cogram.keyword_recall"
@@ -33,7 +35,7 @@ TEXT_WEIGHT = 1.0
 
 SKILL_CONTRACT: Dict[str, Any] = {
     "name": SKILL_NAME,
-    "version": "0.2.0",
+    "version": "0.3.0",
     "purpose": "Recall up to N previously captured notes whose keywords overlap the issue text.",
     "input": {
         "issue_text": "string, free-form issue or task description",
@@ -60,7 +62,7 @@ SKILL_CONTRACT: Dict[str, Any] = {
 
 BIND_CONTRACT: Dict[str, Any] = {
     "name": BIND_SKILL_NAME,
-    "version": "0.2.0",
+    "version": "0.3.0",
     "purpose": "Bind a map of subtask-id → evidence onto a triage checklist. Missing evidence fails the item.",
     "input": {
         "subtasks": "list of {id, title}",
@@ -76,7 +78,59 @@ BIND_CONTRACT: Dict[str, Any] = {
     "reuse": "any verifier or CI job may call it",
 }
 
-SKILL_CATALOG: List[Dict[str, Any]] = [SKILL_CONTRACT, BIND_CONTRACT]
+REDACT_SKILL_NAME = "cogram.redact"
+GATE_SKILL_NAME = "cogram.approval_gate"
+PATH_SKILL_NAME = "cogram.path_guard"
+
+REDACT_CONTRACT: Dict[str, Any] = {
+    "name": REDACT_SKILL_NAME,
+    "version": "0.3.0",
+    "purpose": "Strip secret-shaped tokens from text before it is written to the note store.",
+    "input": {"text": "string"},
+    "output": {"text": "redacted string", "redactions": "int, how many spans were replaced"},
+    "invocation": "inside A2 capture, before append",
+    "failure_mode": "returns the original text with redactions=0; never raises on a clean string",
+    "security": ["pure function; does not touch storage"],
+    "reuse": "any writer that accepts free-form text",
+}
+
+GATE_CONTRACT: Dict[str, Any] = {
+    "name": GATE_SKILL_NAME,
+    "version": "0.3.0",
+    "purpose": "Turn (verified, human decision) into a single write-permission.",
+    "input": {
+        "verified": "bool, checklist complete",
+        "decision": "true / false / null (no approver yet)",
+    },
+    "output": {
+        "allowed": "true only when verified and decision is true",
+        "state": "blocked_unverified | pending | approved | rejected",
+    },
+    "invocation": "after A3, before any capture",
+    "failure_mode": "allowed=false; never invents a yes",
+    "security": ["pure function; the only way a write is licensed"],
+    "reuse": "pipeline, CI, or an MCP approval tool",
+}
+
+PATH_CONTRACT: Dict[str, Any] = {
+    "name": PATH_SKILL_NAME,
+    "version": "0.3.0",
+    "purpose": "Refuse a note-store path that looks like a credential file.",
+    "input": {"path": "string"},
+    "output": {"allowed": "bool", "reason": "string when refused"},
+    "invocation": "before NoteStore.load / save",
+    "failure_mode": "allowed=false plus a reason; does not raise",
+    "security": ["pure function over the path string"],
+    "reuse": "any agent that is about to open a scratchpad file",
+}
+
+SKILL_CATALOG: List[Dict[str, Any]] = [
+    SKILL_CONTRACT,
+    BIND_CONTRACT,
+    REDACT_CONTRACT,
+    GATE_CONTRACT,
+    PATH_CONTRACT,
+]
 
 
 def _band_and_reason(text_hits: List[str], tag_hits: List[str]) -> tuple[str, str]:
@@ -185,4 +239,72 @@ def evidence_bind(
         "skill": BIND_SKILL_NAME,
         "items": items,
         "verified": verified,
+    }
+
+
+#: Shapes a human would recognise as a secret in an issue comment. This is
+#: not a complete secret scanner; it is the slice-sized version of "do not
+#: write the key into the scratchpad".
+_REDACT_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"(?i)\b(api[_-]?key|token|password|secret|passwd)\s*[:=]\s*\S+"),
+    re.compile(r"\bghp_[A-Za-z0-9]{20,}"),
+    re.compile(r"\bgho_[A-Za-z0-9]{20,}"),
+    re.compile(r"\bsk-[A-Za-z0-9]{20,}"),
+    re.compile(r"\bAKIA[A-Z0-9]{16}"),
+)
+
+
+def redact(text: str) -> Dict[str, Any]:
+    """Replace secret-shaped spans with ``[REDACTED]``."""
+    out = text
+    hits = 0
+    for pattern in _REDACT_PATTERNS:
+        out, count = pattern.subn("[REDACTED]", out)
+        hits += count
+    return {
+        "skill": REDACT_SKILL_NAME,
+        "text": out,
+        "redactions": hits,
+    }
+
+
+def approval_gate(verified: bool, decision: Optional[bool]) -> Dict[str, Any]:
+    """License a write. A missing decision is pending, never a yes."""
+    if not verified:
+        state = "blocked_unverified"
+        allowed = False
+    elif decision is None:
+        state = "pending"
+        allowed = False
+    elif decision:
+        state = "approved"
+        allowed = True
+    else:
+        state = "rejected"
+        allowed = False
+    return {
+        "skill": GATE_SKILL_NAME,
+        "allowed": allowed,
+        "state": state,
+        "verified": bool(verified),
+        "decision": decision,
+    }
+
+
+def path_guard(path: str) -> Dict[str, Any]:
+    """Same denylist as ``NoteStore``, as a reusable skill."""
+    try:
+        _assert_safe_path(path)
+    except NoteStoreError as exc:
+        return {
+            "skill": PATH_SKILL_NAME,
+            "allowed": False,
+            "path": path,
+            "reason": str(exc),
+        }
+    return {
+        "skill": PATH_SKILL_NAME,
+        "allowed": True,
+        "path": path,
+        "reason": "",
     }

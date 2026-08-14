@@ -25,6 +25,11 @@ SYNONYM_GROUPS: List[List[str]] = [
     ["slow", "latency", "performance", "卡顿", "性能"],
     ["test", "tests", "pytest", "regression", "测试", "回归"],
     ["docs", "readme", "documentation", "文档"],
+    ["cors", "corserror"],
+    ["oauth", "oidc"],
+    ["hung", "hang", "hangs"],
+    ["504", "gateway"],
+    ["multipart", "formdata"],
 ]
 
 

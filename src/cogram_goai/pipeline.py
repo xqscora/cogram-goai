@@ -9,6 +9,7 @@ from cogram_goai.agents.memory import KeywordMemoryAgent
 from cogram_goai.agents.triage import Subtask, TriageClerk
 from cogram_goai.agents.verifier import ChecklistItem, ChecklistVerifier
 from cogram_goai.notes import Note, NoteStore
+from cogram_goai.skill import approval_gate
 from cogram_goai.trace import Trace
 
 #: An approval callback receives the result-so-far and returns True to merge.
@@ -87,6 +88,7 @@ def run_pipeline(
         citations=[item["id"] for item in result.context.get("citations", [])],
         auto_inject=result.context.get("auto_inject", []),
         fallback=result.context.get("fallback"),
+        conflict=result.context.get("conflict"),
     )
 
     result.checklist = ChecklistVerifier().run(result.subtasks, evidence=evidence, trace=trace)
@@ -101,9 +103,16 @@ def run_pipeline(
         return result
 
     result.approved = bool(approve(result))
-    trace.record(PIPELINE_AGENT, "human_approval", approved=result.approved)
+    gate = approval_gate(result.verified, result.approved)
+    trace.record(
+        PIPELINE_AGENT,
+        "human_approval",
+        approved=result.approved,
+        gate_state=gate["state"],
+        allowed=gate["allowed"],
+    )
 
-    if result.approved and capture:
+    if gate["allowed"] and capture:
         cause, fix = _cause_fix_from_context(result.context)
         note = memory.capture(
             _capture_text(result),
@@ -126,6 +135,8 @@ def rollback_capture(store: NoteStore, note_id: str, trace: Optional[Trace] = No
 
 
 def _cause_fix_from_context(context: Mapping[str, Any]) -> tuple[str, str]:
+    if context.get("conflict"):
+        return "", ""
     for item in context.get("citations") or []:
         if item.get("band") == "high":
             return str(item.get("cause") or ""), str(item.get("fix") or "")

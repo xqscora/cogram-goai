@@ -70,6 +70,32 @@ class CliTest(unittest.TestCase):
             self.assertEqual(before, handle.read())
         self.assertTrue(os.path.exists(os.path.join(tmp, "cogram_demo_notes.json")))
 
+    def test_conflict_demo_suppresses_auto_inject(self):
+        code, out = _run(["demo", "--conflict", "--auto-approve", "--no-capture"])
+        self.assertEqual(code, 0)
+        self.assertIn("CONFLICT", out)
+        self.assertIn("auto-inject suppressed", out)
+
+    def test_verify_trace_accepts_a_fresh_demo(self):
+        tmp = tempfile.mkdtemp()
+        path = os.path.join(tmp, "run.jsonl")
+        cwd = os.getcwd()
+        os.chdir(tmp)
+        try:
+            code, _ = _run(["demo", "--auto-approve", "--no-capture", "--trace", path])
+            self.assertEqual(code, 0)
+            vcode, vout = _run(["verify-trace", "--trace", path])
+        finally:
+            os.chdir(cwd)
+        self.assertEqual(vcode, 0)
+        self.assertIn("hash chain intact", vout)
+
+    def test_tools_lists_five_skills(self):
+        code, out = _run(["tools"])
+        self.assertEqual(code, 0)
+        names = [item["name"] for item in json.loads(out)]
+        self.assertEqual(len(names), 5)
+
 
 if __name__ == "__main__":
     unittest.main()

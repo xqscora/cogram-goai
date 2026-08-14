@@ -5,7 +5,7 @@ Print the machine-readable version at any time with `cogram-goai contract`.
 | Field | Value |
 |---|---|
 | **Name** | `cogram.keyword_recall` |
-| **Version** | 0.2.0 |
+| **Version** | 0.3.0 |
 | **Purpose** | Recall up to N previously captured notes whose keywords overlap the issue text |
 | **Invocation point** | After triage, before any patch is written |
 | **Dependent tools** | Local file read/write, or an equivalent MCP file tool |

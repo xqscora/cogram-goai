@@ -18,11 +18,12 @@ from cogram_goai.pipeline import (
     run_pipeline,
 )
 from cogram_goai.skill import SKILL_CATALOG, SKILL_CONTRACT, keyword_recall
-from cogram_goai.trace import Trace
+from cogram_goai.trace import Trace, TraceError
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO_ROOT = os.path.abspath(os.path.join(_HERE, "..", ".."))
 DEFAULT_NOTES = os.path.join(_REPO_ROOT, "examples", "notes.json")
+CONFLICT_NOTES = os.path.join(_REPO_ROOT, "examples", "conflict_notes.json")
 DEFAULT_ISSUE = os.path.join(_REPO_ROOT, "examples", "issues", "flaky_upload_timeout.txt")
 
 
@@ -59,6 +60,12 @@ def _print_result(result: PipelineResult) -> None:
     auto = result.context.get("auto_inject") or []
     if auto:
         print("  auto-inject (high band): %s" % ", ".join(auto))
+    conflict = result.context.get("conflict")
+    if conflict:
+        print("  CONFLICT: high-band notes disagree on cause")
+        print("    notes: %s" % ", ".join(conflict.get("note_ids") or []))
+        print("    causes: %s" % " | ".join(conflict.get("causes") or []))
+        print("    auto-inject suppressed")
 
     print("\n[A3 verifier] %s" % ("all items passed" if result.verified else "incomplete"))
     for item in result.checklist:
@@ -70,9 +77,10 @@ def _print_result(result: PipelineResult) -> None:
 
 
 def _cmd_demo(args: argparse.Namespace) -> int:
-    store = _load_store(args.notes)
+    notes_path = CONFLICT_NOTES if getattr(args, "conflict", False) and args.notes == DEFAULT_NOTES else args.notes
+    store = _load_store(notes_path)
     # Never let the demo mutate the checked-in example store.
-    if os.path.abspath(args.notes) == os.path.abspath(DEFAULT_NOTES):
+    if os.path.abspath(notes_path) in {os.path.abspath(DEFAULT_NOTES), os.path.abspath(CONFLICT_NOTES)}:
         store.path = os.path.join(os.getcwd(), "cogram_demo_notes.json")
     trace = Trace(path=args.trace)
     issue = _read_issue(args)
@@ -156,6 +164,24 @@ def _cmd_replay(args: argparse.Namespace) -> int:
         elif "hits" in payload:
             extra = " hits=%s" % payload["hits"]
         print("  %s  %s.%s%s" % (entry.get("ts", ""), entry["agent"], entry["event"], extra))
+    errors = trace.verify()
+    if errors:
+        print("chain: TAMPERED")
+        for item in errors:
+            print("  %s" % item)
+        return 1
+    if any("hash" in entry for entry in trace.events):
+        print("chain: ok")
+    return 0
+
+
+def _cmd_verify_trace(args: argparse.Namespace) -> int:
+    try:
+        trace = Trace.load(args.trace, verify_chain=True)
+    except TraceError as exc:
+        print(exc)
+        return 1
+    print("ok: %d event(s), hash chain intact, run_id=%s" % (len(trace.events), trace.run_id))
     return 0
 
 
@@ -204,6 +230,7 @@ def build_parser() -> argparse.ArgumentParser:
     demo.add_argument("--trace", help="write the JSONL trace to this path")
     demo.add_argument("--auto-approve", action="store_true", help="skip the interactive gate")
     demo.add_argument("--no-capture", action="store_true", help="do not write a note back")
+    demo.add_argument("--conflict", action="store_true", help="demo two high-band notes that disagree on cause")
     demo.set_defaults(func=_cmd_demo)
 
     run = sub.add_parser("run", help="run the pipeline on your own issue")
@@ -243,6 +270,10 @@ def build_parser() -> argparse.ArgumentParser:
     replay = sub.add_parser("replay", help="print a saved JSONL trace")
     replay.add_argument("--trace", required=True, help="path to a JSONL trace written by a previous run")
     replay.set_defaults(func=_cmd_replay)
+
+    verify = sub.add_parser("verify-trace", help="check the hash chain on a saved JSONL trace")
+    verify.add_argument("--trace", required=True)
+    verify.set_defaults(func=_cmd_verify_trace)
 
     return parser
 

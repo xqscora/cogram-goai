@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, List, Optional
 
 from cogram_goai.notes import Note, NoteStore
-from cogram_goai.skill import SKILL_NAME, keyword_recall
+from cogram_goai.skill import SKILL_NAME, keyword_recall, redact
 
 AGENT_NAME = "A2.keyword_memory"
 
@@ -52,7 +52,8 @@ class KeywordMemoryAgent:
         cause: str = "",
         fix: str = "",
     ) -> Note:
-        note = self.store.append(text, tags, cause=cause, fix=fix)
+        cleaned = redact(text)
+        note = self.store.append(cleaned["text"], tags, cause=cause, fix=fix)
         if self.store.path:
             self.store.save()
         if trace is not None:
@@ -62,6 +63,7 @@ class KeywordMemoryAgent:
                 note_id=note.id,
                 tags=list(note.tags),
                 persisted=bool(self.store.path),
+                redactions=cleaned["redactions"],
             )
         return note
 
@@ -74,22 +76,44 @@ class KeywordMemoryAgent:
         return note
 
     def context_packet(self, result: Dict[str, Any]) -> Dict[str, Any]:
-        """Bounded, cited context for the next agent. Never a bare dump."""
+        """Bounded, cited context for the next agent. Never a bare dump.
+
+        Two ``high`` notes with *different non-empty causes* is a conflict:
+        auto-inject is emptied so the next agent cannot silently pick a side.
+        The human at the gate still sees every citation.
+        """
         notes = result.get("notes") or []
+        citations = [
+            {
+                "id": note["id"],
+                "band": note.get("band", "unknown"),
+                "reason": note.get("reason", ""),
+                "text": note["text"],
+                "cause": note.get("cause") or "",
+                "fix": note.get("fix") or "",
+            }
+            for note in notes
+        ]
+        high = [item for item in citations if item["band"] == "high"]
+        causes: List[str] = []
+        for item in high:
+            cause = item["cause"].strip()
+            if cause and cause not in causes:
+                causes.append(cause)
+        conflict: Optional[Dict[str, Any]] = None
+        auto_inject = [item["id"] for item in high]
+        if len(causes) > 1:
+            auto_inject = []
+            conflict = {
+                "note_ids": [item["id"] for item in high],
+                "causes": causes,
+                "reason": "high_band_cause_mismatch",
+            }
         return {
-            "citations": [
-                {
-                    "id": note["id"],
-                    "band": note.get("band", "unknown"),
-                    "reason": note.get("reason", ""),
-                    "text": note["text"],
-                    "cause": note.get("cause") or "",
-                    "fix": note.get("fix") or "",
-                }
-                for note in notes
-            ],
+            "citations": citations,
             "fallback": result.get("fallback"),
-            "auto_inject": [note["id"] for note in notes if note.get("band") == "high"],
+            "auto_inject": auto_inject,
+            "conflict": conflict,
         }
 
     def context_lines(self, result: Dict[str, Any]) -> List[str]:

@@ -33,12 +33,12 @@
 |---|---|
 | `cogram_goai.tokenize` | The one tokenizer, shared by agents and skill |
 | `cogram_goai.notes` | `Note`, `NoteStore`, path safety rules |
-| `cogram_goai.skill` | `cogram.keyword_recall` and its contract |
+| `cogram_goai.skill` | five reusable skills (recall, bind, redact, gate, path) |
 | `cogram_goai.agents.triage` | A1 — issue → subtasks |
 | `cogram_goai.agents.memory` | A2 — the only module that reads or writes the store |
 | `cogram_goai.agents.verifier` | A3 — checklist over subtasks and evidence |
 | `cogram_goai.pipeline` | Orchestration, approval gate, capture |
-| `cogram_goai.trace` | Append-only JSONL event log |
+| `cogram_goai.trace` | Hash-chained JSONL event log |
 | `cogram_goai.cli` | `cogram-goai` commands |
 
 ## Why this shape
@@ -65,11 +65,12 @@ so a scheduled or headless invocation cannot grow memory on its own. Two helpers
 | `task_input` | pipeline | `chars`, `notes_in_store` |
 | `decomposition` | A1 | `subtasks[]`, `budget_total` |
 | `skill_call` | A2 | `skill`, `hits`, `note_ids`, `matched_tags`, `fallback` |
+| `context_packet` | pipeline | `citations[]`, `auto_inject`, `fallback`, `conflict` |
 | `verification` | A3 | `passed`, `total`, `items[]` |
 | `gate_skipped` | pipeline | `reason=checklist_incomplete` |
 | `gate_pending` | pipeline | `reason=no_approver` |
-| `human_approval` | pipeline | `approved` |
-| `experience_capture` | A2 | `note_id`, `tags`, `persisted` |
+| `human_approval` | pipeline | `approved`, `gate_state`, `allowed` |
+| `experience_capture` | A2 | `note_id`, `tags`, `persisted`, `redactions` |
 
 A run that reaches `experience_capture` without a preceding `human_approval`
 with `approved=true` would be a bug; `tests/test_pipeline.py` asserts the

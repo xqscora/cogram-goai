@@ -10,10 +10,10 @@ afternoon.
 | Included | Where |
 |---|---|
 | Three agents with explicit decision boundaries | `src/cogram_goai/agents/` |
-| Two reusable skills | `cogram.keyword_recall`, `cogram.evidence_bind` |
+| Five reusable skills | recall, evidence_bind, redact, approval_gate, path_guard |
 | Audited synonym table (not embeddings) | `src/cogram_goai/aliases.py` |
-| Cited context packet + evidence bands | `agents/memory.py` `context_packet` |
-| Append-only JSONL trace + replay | `src/cogram_goai/trace.py`, `cogram-goai replay` |
+| Cited context packet + evidence bands + conflict | `agents/memory.py` `context_packet` |
+| Hash-chained JSONL trace + replay + verify | `src/cogram_goai/trace.py`, `cogram-goai verify-trace` |
 | Human approval gate | `src/cogram_goai/pipeline.py` |
 | Rollback that does not delete the row | `NoteStore.rollback` |
 | CLI and runnable example | `src/cogram_goai/cli.py`, `examples/` |

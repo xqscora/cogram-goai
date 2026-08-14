@@ -1,0 +1,16 @@
+[
+  {
+    "id": "note-stream",
+    "text": "Uploads over 8 MB time out because the retry wrapper reuses an already-consumed stream. Rewind before each retry.",
+    "tags": ["upload", "timeout", "retry"],
+    "cause": "retry wrapper reuses an already-consumed stream",
+    "fix": "rewind the stream before each retry"
+  },
+  {
+    "id": "note-proxy",
+    "text": "Large uploads time out because the reverse proxy idle timeout is 30s. Raise it before touching the retry wrapper.",
+    "tags": ["upload", "timeout", "retry"],
+    "cause": "reverse proxy idle timeout is 30s",
+    "fix": "raise the proxy idle timeout"
+  }
+]
