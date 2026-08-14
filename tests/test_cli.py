@@ -90,6 +90,21 @@ class CliTest(unittest.TestCase):
         self.assertEqual(vcode, 0)
         self.assertIn("hash chain intact", vout)
 
+    def test_verify_trace_complete_accepts_a_capturing_demo(self):
+        tmp = tempfile.mkdtemp()
+        path = os.path.join(tmp, "run.jsonl")
+        cwd = os.getcwd()
+        os.chdir(tmp)
+        try:
+            code, out = _run(["demo", "--auto-approve", "--trace", path])
+            self.assertEqual(code, 0)
+            self.assertIn("run_id:", out)
+            vcode, vout = _run(["verify-trace", "--trace", path, "--complete"])
+        finally:
+            os.chdir(cwd)
+        self.assertEqual(vcode, 0)
+        self.assertIn("complete run", vout)
+
     def test_tools_lists_five_skills(self):
         code, out = _run(["tools"])
         self.assertEqual(code, 0)

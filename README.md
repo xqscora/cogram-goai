@@ -43,7 +43,7 @@ pip install -e .
 cogram-goai demo --auto-approve --trace run.jsonl
 cogram-goai demo --conflict --auto-approve --no-capture
 cogram-goai replay --trace run.jsonl
-cogram-goai verify-trace --trace run.jsonl
+cogram-goai verify-trace --trace run.jsonl --complete
 cogram-goai tools
 ```
 
@@ -52,6 +52,8 @@ Requires Python 3.9+. There are no runtime dependencies.
 Sample output:
 
 ```
+run_id: de9a33478415
+
 [A1 triage] 3 subtasks
   - t1 (reproduce, budget 2) Reproduce: Large file upload fails with a timeout...
   - t2 (locate, budget 3) Locate the responsible module for: ...

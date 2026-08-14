@@ -21,4 +21,6 @@ jobs:
       - run: pip install -e .
       - run: python -m unittest discover tests -v
       - run: cogram-goai demo --auto-approve --trace run.jsonl
+      - run: cogram-goai verify-trace --trace run.jsonl --complete
+      - run: cogram-goai demo --conflict --auto-approve --no-capture
       - run: cogram-goai contract
