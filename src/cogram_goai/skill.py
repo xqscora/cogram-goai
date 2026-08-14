@@ -62,15 +62,15 @@ SKILL_CONTRACT: Dict[str, Any] = {
 
 BIND_CONTRACT: Dict[str, Any] = {
     "name": BIND_SKILL_NAME,
-    "version": "0.3.0",
-    "purpose": "Bind a map of subtask-id → evidence onto a triage checklist. Missing evidence fails the item.",
+    "version": "0.3.2",
+    "purpose": "Bind a map of subtask-id → evidence onto a triage checklist. Missing or reused evidence fails the item.",
     "input": {
         "subtasks": "list of {id, title}",
         "evidence": "object mapping subtask id to a non-empty evidence string",
     },
     "output": {
         "items": "list of {subtask_id, requirement, passed, evidence}",
-        "verified": "true only when every item passed",
+        "verified": "true only when every item passed with its own evidence string",
     },
     "invocation": "after subtasks exist and evidence has been collected",
     "failure_mode": "verified=false; never invents evidence",
@@ -220,18 +220,33 @@ def evidence_bind(
     subtasks: Sequence[Dict[str, Any]],
     evidence: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
-    """Reusable skill: refuse any subtask that has no evidence string."""
+    """Reusable skill: refuse any subtask that has no evidence string.
+
+    The same evidence string cannot cover two subtasks. Copy-pasting
+    ``ok`` onto every id is how a checklist becomes theatre.
+    """
     evidence = evidence or {}
     items: List[Dict[str, Any]] = []
+    seen: List[str] = []
     for task in subtasks:
         task_id = str(task.get("id", ""))
         supplied = str(evidence.get(task_id, "")).strip()
+        if not supplied:
+            passed = False
+            shown = "(missing)"
+        elif supplied in seen:
+            passed = False
+            shown = "(reused) " + supplied
+        else:
+            passed = True
+            shown = supplied
+            seen.append(supplied)
         items.append(
             {
                 "subtask_id": task_id,
                 "requirement": str(task.get("title") or task.get("requirement") or ""),
-                "passed": bool(supplied),
-                "evidence": supplied or "(missing)",
+                "passed": passed,
+                "evidence": shown,
             }
         )
     verified = bool(items) and all(item["passed"] for item in items)

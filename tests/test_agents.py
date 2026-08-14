@@ -61,7 +61,7 @@ class ChecklistVerifierTest(unittest.TestCase):
         self.assertTrue(all(item.evidence == "(missing)" for item in items))
 
     def test_full_evidence_passes(self):
-        evidence = {task.id: "log line" for task in self.tasks}
+        evidence = {task.id: "log line for %s" % task.id for task in self.tasks}
         items = ChecklistVerifier().run(self.tasks, evidence=evidence)
         self.assertTrue(ChecklistVerifier.all_passed(items))
 

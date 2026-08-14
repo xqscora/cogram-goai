@@ -157,7 +157,7 @@ Useful flags: `--notes PATH`, `--trace PATH`, `--auto-approve` / `--reject`, `--
 
 1. **Nothing is written without a human yes.** `run_pipeline` returns
    `approved=None` when no approver is supplied.
-2. **An unevidenced subtask fails the checklist.** Presence, not quality.
+2. **An unevidenced subtask fails the checklist.** Presence, not quality. The same sentence cannot cover two subtasks.
 3. **Only one agent touches storage.** `KeywordMemoryAgent` owns every read
    and write. Rollback is the same agent.
 4. **The note store cannot be pointed at secrets.** Paths containing `.env`,

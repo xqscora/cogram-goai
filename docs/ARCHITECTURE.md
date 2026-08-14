@@ -62,7 +62,7 @@ so a scheduled or headless invocation cannot grow memory on its own. Two helpers
 
 | Event | Emitted by | Payload highlights |
 |---|---|---|
-| `task_input` | pipeline | `chars`, `notes_in_store` |
+| `task_input` | pipeline | `chars`, `issue_hash`, `notes_in_store` |
 | `decomposition` | A1 | `subtasks[]`, `budget_total` |
 | `skill_call` | A2 | `skill`, `hits`, `note_ids`, `matched_tags`, `fallback` |
 | `context_packet` | pipeline | `citations[]`, `auto_inject`, `fallback`, `conflict` |
@@ -70,7 +70,7 @@ so a scheduled or headless invocation cannot grow memory on its own. Two helpers
 | `gate_skipped` | pipeline | `reason=checklist_incomplete` |
 | `gate_pending` | pipeline | `reason=no_approver` |
 | `human_approval` | pipeline | `approved`, `gate_state`, `allowed` |
-| `experience_capture` | A2 | `note_id`, `tags`, `persisted`, `redactions` |
+| `experience_capture` | A2 | `note_id`, `tags`, `persisted`, `redactions`, `deduped`, `issue_hash` |
 
 A run that reaches `experience_capture` without a preceding `human_approval`
 with `approved=true` would be a bug; `tests/test_pipeline.py` asserts the

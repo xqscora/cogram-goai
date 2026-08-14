@@ -27,7 +27,7 @@ class HashChainTest(unittest.TestCase):
         ])
         issue = "Large uploads crash with a timeout on retry; we need a regression test."
         dry = run_pipeline(issue, store, trace=Trace(path=path))
-        evidence = {task.id: "ok" for task in dry.subtasks}
+        evidence = {task.id: "ok %s" % task.id for task in dry.subtasks}
         run_pipeline(issue, store, evidence=evidence, approve=approve_always, trace=Trace(path=path))
         loaded = Trace.load(path, verify_chain=True)
         self.assertGreaterEqual(len(loaded.events), 2)
@@ -88,7 +88,7 @@ class ConflictTest(unittest.TestCase):
         ])
         issue = "Large uploads crash with a timeout on retry; we need a regression test."
         dry = run_pipeline(issue, store)
-        evidence = {task.id: "ok" for task in dry.subtasks}
+        evidence = {task.id: "ok %s" % task.id for task in dry.subtasks}
         result = run_pipeline(issue, store, evidence=evidence, approve=approve_always)
         captured = next(note for note in store if note.id == result.captured_note_id)
         self.assertEqual(captured.cause, "")
@@ -110,7 +110,7 @@ class SecuritySkillTest(unittest.TestCase):
         ])
         issue = "Large uploads crash with a timeout on retry; password=supersecret we need a regression test."
         dry = run_pipeline(issue, store)
-        evidence = {task.id: "ok" for task in dry.subtasks}
+        evidence = {task.id: "ok %s" % task.id for task in dry.subtasks}
         result = run_pipeline(issue, store, evidence=evidence, approve=approve_always)
         captured = next(note for note in store if note.id == result.captured_note_id)
         self.assertNotIn("supersecret", captured.text)

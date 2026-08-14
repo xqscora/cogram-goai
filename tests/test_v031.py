@@ -31,7 +31,7 @@ class ProvenanceTest(unittest.TestCase):
     def test_capture_records_run_id_and_issue_hash(self):
         store = _store()
         dry = run_pipeline(ISSUE, store)
-        evidence = {task.id: "ok" for task in dry.subtasks}
+        evidence = {task.id: "ok %s" % task.id for task in dry.subtasks}
         result = run_pipeline(ISSUE, store, evidence=evidence, approve=approve_always)
         captured = next(note for note in store if note.id == result.captured_note_id)
         self.assertEqual(captured.issue_hash, result.issue_hash)
@@ -41,7 +41,7 @@ class ProvenanceTest(unittest.TestCase):
     def test_second_approved_run_does_not_duplicate(self):
         store = _store()
         dry = run_pipeline(ISSUE, store)
-        evidence = {task.id: "ok" for task in dry.subtasks}
+        evidence = {task.id: "ok %s" % task.id for task in dry.subtasks}
         first = run_pipeline(ISSUE, store, evidence=evidence, approve=approve_always)
         before = len(store)
         second = run_pipeline(ISSUE, store, evidence=evidence, approve=approve_always)
@@ -49,6 +49,20 @@ class ProvenanceTest(unittest.TestCase):
         self.assertEqual(first.captured_note_id, second.captured_note_id)
         capture = second.trace.by_event("experience_capture")[0]
         self.assertTrue(capture["payload"]["deduped"])
+
+
+class UniqueEvidenceTest(unittest.TestCase):
+    def test_copy_pasted_ok_fails_the_checklist(self):
+        from cogram_goai.skill import evidence_bind
+
+        bound = evidence_bind(
+            [{"id": "t1", "title": "repro"}, {"id": "t2", "title": "fix"}],
+            {"t1": "ok", "t2": "ok"},
+        )
+        self.assertFalse(bound["verified"])
+        self.assertTrue(bound["items"][0]["passed"])
+        self.assertFalse(bound["items"][1]["passed"])
+        self.assertTrue(bound["items"][1]["evidence"].startswith("(reused)"))
 
 
 class SecurityTriageTest(unittest.TestCase):
@@ -67,7 +81,7 @@ class CompleteTraceTest(unittest.TestCase):
     def test_finished_run_is_complete(self):
         store = _store()
         dry = run_pipeline(ISSUE, store)
-        evidence = {task.id: "ok" for task in dry.subtasks}
+        evidence = {task.id: "ok %s" % task.id for task in dry.subtasks}
         result = run_pipeline(ISSUE, store, evidence=evidence, approve=approve_always)
         self.assertEqual(result.trace.verify_complete(), [])
 
@@ -86,7 +100,7 @@ class CompleteTraceTest(unittest.TestCase):
         path = os.path.join(tmp, "run.jsonl")
         store = _store()
         dry = run_pipeline(ISSUE, store)
-        evidence = {task.id: "ok" for task in dry.subtasks}
+        evidence = {task.id: "ok %s" % task.id for task in dry.subtasks}
         run_pipeline(ISSUE, store, evidence=evidence, approve=approve_always, trace=Trace(path=path))
         buffer = io.StringIO()
         with redirect_stdout(buffer):

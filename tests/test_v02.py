@@ -69,7 +69,7 @@ class RollbackTest(unittest.TestCase):
         ])
         issue = "Large uploads crash with a timeout on retry; we need a regression test."
         dry = run_pipeline(issue, store)
-        evidence = {task.id: "ok" for task in dry.subtasks}
+        evidence = {task.id: "ok %s" % task.id for task in dry.subtasks}
         result = run_pipeline(issue, store, evidence=evidence, approve=approve_always)
         self.assertIsNotNone(result.captured_note_id)
         before = len(store)
