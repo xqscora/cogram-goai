@@ -4,7 +4,7 @@ Educational slice released for the GOAI 2026 Agent Infra track. See docs/SCOPE.m
 for what this project deliberately does not contain.
 """
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 
 from cogram_goai.notes import Note, NoteStore
 from cogram_goai.pipeline import PipelineResult, issue_hash, rollback_capture, run_pipeline

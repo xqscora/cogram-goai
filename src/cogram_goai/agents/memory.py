@@ -53,6 +53,7 @@ class KeywordMemoryAgent:
         fix: str = "",
         run_id: str = "",
         issue_hash: str = "",
+        cited: Iterable[str] = (),
     ) -> Note:
         cleaned = redact(text)
         existing = self.store.find_duplicate(issue_hash, cause, fix)
@@ -67,6 +68,7 @@ class KeywordMemoryAgent:
                     redactions=cleaned["redactions"],
                     deduped=True,
                     issue_hash=issue_hash,
+                    cited=list(existing.cited),
                 )
             return existing
         note = self.store.append(
@@ -76,6 +78,7 @@ class KeywordMemoryAgent:
             fix=fix,
             run_id=run_id,
             issue_hash=issue_hash,
+            cited=cited,
         )
         if self.store.path:
             self.store.save()
@@ -89,6 +92,7 @@ class KeywordMemoryAgent:
                 redactions=cleaned["redactions"],
                 deduped=False,
                 issue_hash=issue_hash,
+                cited=list(note.cited),
             )
         return note
 

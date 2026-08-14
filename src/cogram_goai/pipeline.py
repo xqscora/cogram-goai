@@ -130,6 +130,7 @@ def run_pipeline(
 
     if gate["allowed"] and capture:
         cause, fix = _cause_fix_from_context(result.context)
+        cited = [str(item.get("id")) for item in (result.context.get("citations") or []) if item.get("id")]
         note = memory.capture(
             _capture_text(result),
             tags=capture_tags or result.recall.get("matched_tags", []),
@@ -138,6 +139,7 @@ def run_pipeline(
             fix=fix,
             run_id=trace.run_id,
             issue_hash=digest,
+            cited=cited,
         )
         result.captured_note_id = note.id
 

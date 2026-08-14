@@ -169,7 +169,7 @@ Useful flags: `--notes PATH`, `--trace PATH`, `--auto-approve` / `--reject`, `--
 8. **Conflict is visible.** Two `high` notes with different causes empty
    `auto_inject`. The human still sees every citation.
 9. **The trace is tamper-evident.** Editing a JSONL line breaks `verify-trace`.
-10. **A capture cites its run.** Each written note stores `run_id` and `issue_hash`. The same pair is not appended twice.
+10. **A capture cites its run.** Each written note stores `run_id`, `issue_hash`, and the note ids that were in the context packet. The same pair is not appended twice.
 11. **Security cues become a budgeted subtask.** `auth` / `cors` / `oauth` / `xss` add a `secure` item instead of hoping the fix agent notices.
 
 ---

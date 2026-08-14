@@ -38,6 +38,7 @@ class Note:
     status: str = STATUS_ACTIVE
     run_id: str = ""
     issue_hash: str = ""
+    cited: List[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, raw: Dict[str, Any]) -> "Note":
@@ -58,6 +59,7 @@ class Note:
             status=status,
             run_id=str(raw.get("run_id") or "").strip(),
             issue_hash=str(raw.get("issue_hash") or "").strip(),
+            cited=[str(item).strip() for item in (raw.get("cited") or []) if str(item).strip()],
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -75,6 +77,8 @@ class Note:
             payload["run_id"] = self.run_id
         if self.issue_hash:
             payload["issue_hash"] = self.issue_hash
+        if self.cited:
+            payload["cited"] = list(self.cited)
         return payload
 
 
@@ -128,6 +132,7 @@ class NoteStore:
         fix: str = "",
         run_id: str = "",
         issue_hash: str = "",
+        cited: Iterable[str] = (),
     ) -> Note:
         text = text.strip()
         if not text:
@@ -140,6 +145,7 @@ class NoteStore:
             fix=fix.strip(),
             run_id=run_id.strip(),
             issue_hash=issue_hash.strip(),
+            cited=[str(item).strip() for item in cited if str(item).strip()],
         )
         self.notes.append(note)
         return note

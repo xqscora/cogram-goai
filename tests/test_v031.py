@@ -51,6 +51,17 @@ class ProvenanceTest(unittest.TestCase):
         self.assertTrue(capture["payload"]["deduped"])
 
 
+class CitedCaptureTest(unittest.TestCase):
+    def test_capture_lists_the_notes_that_were_in_context(self):
+        store = _store()
+        dry = run_pipeline(ISSUE, store)
+        evidence = {task.id: "ok %s" % task.id for task in dry.subtasks}
+        result = run_pipeline(ISSUE, store, evidence=evidence, approve=approve_always)
+        captured = next(note for note in store if note.id == result.captured_note_id)
+        self.assertIn("n1", captured.cited)
+        self.assertEqual(captured.cited, [item["id"] for item in result.context["citations"]])
+
+
 class UniqueEvidenceTest(unittest.TestCase):
     def test_copy_pasted_ok_fails_the_checklist(self):
         from cogram_goai.skill import evidence_bind
