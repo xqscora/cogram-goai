@@ -11,6 +11,14 @@ from typing import Any, Dict, List, Optional
 
 GENESIS_HASH = "0" * 64
 
+#: A finished pipeline run must contain one event from each group.
+COMPLETE_EVENT_GROUPS = (
+    ("task_input",),
+    ("decomposition",),
+    ("verification",),
+    ("human_approval", "gate_pending", "gate_skipped"),
+)
+
 
 class TraceError(RuntimeError):
     pass
@@ -104,6 +112,15 @@ class Trace:
             elif digest != event_hash(entry):
                 errors.append("event %d: hash mismatch (payload edited)" % index)
             expected_prev = str(digest or "")
+        return errors
+
+    def verify_complete(self) -> List[str]:
+        """Hash chain plus the event set a finished run must leave behind."""
+        errors = list(self.verify())
+        seen = {entry.get("event") for entry in self.events}
+        for group in COMPLETE_EVENT_GROUPS:
+            if not seen.intersection(group):
+                errors.append("missing event: %s" % " or ".join(group))
         return errors
 
     @classmethod

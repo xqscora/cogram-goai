@@ -13,6 +13,7 @@ _REPRODUCE_CUES = {"crash", "error", "fails", "failing", "traceback", "exception
 _TEST_CUES = {"test", "tests", "regression", "coverage", "pytest", "测试", "回归"}
 _DOC_CUES = {"doc", "docs", "readme", "documentation", "文档"}
 _PERF_CUES = {"slow", "timeout", "latency", "performance", "memory", "卡顿", "超时", "性能"}
+_SECURITY_CUES = {"auth", "cors", "oauth", "oidc", "xss", "csrf", "secret", "leak", "越权", "注入"}
 
 _MAX_SUBTASKS = 3
 
@@ -66,6 +67,7 @@ class TriageClerk:
         perf_cues = sorted(tokens & _PERF_CUES)
         test_cues = sorted(tokens & _TEST_CUES)
         doc_cues = sorted(tokens & _DOC_CUES)
+        security_cues = sorted(tokens & _SECURITY_CUES)
 
         if repro_cues:
             add("reproduce", "Reproduce: %s" % summary, 2, repro_cues)
@@ -73,6 +75,8 @@ class TriageClerk:
             add("measure", "Measure the reported slowdown: %s" % summary, 2, perf_cues)
 
         add("locate", "Locate the responsible module for: %s" % summary, 3, [])
+        if security_cues:
+            add("secure", "Review the security surface for: %s" % summary, 2, security_cues)
         add("fix", "Draft the smallest fix for: %s" % summary, 3, [])
 
         if test_cues and subtasks and subtasks[-1].kind == "fix":

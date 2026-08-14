@@ -147,7 +147,7 @@ is the same denylist `NoteStore` uses, callable on its own.
 | `cogram-goai notes --add "lesson" --tag retry` | Inspect or extend the note store |
 | `cogram-goai rollback --note-id note-…` | Mark a capture rolled back |
 | `cogram-goai replay --trace run.jsonl` | Print a saved audit trail |
-| `cogram-goai verify-trace --trace run.jsonl` | Check the hash chain |
+| `cogram-goai verify-trace --trace run.jsonl` | Check the hash chain (`--complete` also requires a full event set) |
 
 Useful flags: `--notes PATH`, `--trace PATH`, `--auto-approve` / `--reject`, `--json`.
 
@@ -169,6 +169,8 @@ Useful flags: `--notes PATH`, `--trace PATH`, `--auto-approve` / `--reject`, `--
 8. **Conflict is visible.** Two `high` notes with different causes empty
    `auto_inject`. The human still sees every citation.
 9. **The trace is tamper-evident.** Editing a JSONL line breaks `verify-trace`.
+10. **A capture cites its run.** Each written note stores `run_id` and `issue_hash`. The same pair is not appended twice.
+11. **Security cues become a budgeted subtask.** `auth` / `cors` / `oauth` / `xss` add a `secure` item instead of hoping the fix agent notices.
 
 ---
 

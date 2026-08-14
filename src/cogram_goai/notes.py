@@ -36,6 +36,8 @@ class Note:
     cause: str = ""
     fix: str = ""
     status: str = STATUS_ACTIVE
+    run_id: str = ""
+    issue_hash: str = ""
 
     @classmethod
     def from_dict(cls, raw: Dict[str, Any]) -> "Note":
@@ -54,6 +56,8 @@ class Note:
             cause=str(raw.get("cause") or "").strip(),
             fix=str(raw.get("fix") or "").strip(),
             status=status,
+            run_id=str(raw.get("run_id") or "").strip(),
+            issue_hash=str(raw.get("issue_hash") or "").strip(),
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -67,6 +71,10 @@ class Note:
             payload["cause"] = self.cause
         if self.fix:
             payload["fix"] = self.fix
+        if self.run_id:
+            payload["run_id"] = self.run_id
+        if self.issue_hash:
+            payload["issue_hash"] = self.issue_hash
         return payload
 
 
@@ -118,6 +126,8 @@ class NoteStore:
         note_id: Optional[str] = None,
         cause: str = "",
         fix: str = "",
+        run_id: str = "",
+        issue_hash: str = "",
     ) -> Note:
         text = text.strip()
         if not text:
@@ -128,9 +138,23 @@ class NoteStore:
             tags=normalize_tags(tags),
             cause=cause.strip(),
             fix=fix.strip(),
+            run_id=run_id.strip(),
+            issue_hash=issue_hash.strip(),
         )
         self.notes.append(note)
         return note
+
+    def find_duplicate(self, issue_hash: str, cause: str = "", fix: str = "") -> Optional[Note]:
+        """Same issue + same cited cause/fix → reuse the active row."""
+        digest = (issue_hash or "").strip()
+        if not digest:
+            return None
+        cause = (cause or "").strip()
+        fix = (fix or "").strip()
+        for note in self.active():
+            if note.issue_hash == digest and note.cause == cause and note.fix == fix:
+                return note
+        return None
 
     def rollback(self, note_id: str) -> Note:
         """Mark a note rolled back. The row stays so the audit trail is intact."""

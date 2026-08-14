@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
@@ -26,6 +27,12 @@ def approve_never(_: "PipelineResult") -> bool:
     return False
 
 
+def issue_hash(text: str) -> str:
+    """Stable 16-hex digest of whitespace-normalized issue text."""
+    normalized = " ".join((text or "").split())
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+
+
 @dataclass
 class PipelineResult:
     issue_text: str
@@ -36,6 +43,7 @@ class PipelineResult:
     verified: bool = False
     approved: Optional[bool] = None
     captured_note_id: Optional[str] = None
+    issue_hash: str = ""
     trace: Optional[Trace] = None
 
     @property
@@ -45,6 +53,7 @@ class PipelineResult:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "run_id": self.run_id,
+            "issue_hash": self.issue_hash,
             "issue_text": self.issue_text,
             "subtasks": [task.to_dict() for task in self.subtasks],
             "recall": self.recall,
@@ -73,9 +82,16 @@ def run_pipeline(
     what a headless CI run should see.
     """
     trace = trace or Trace()
-    result = PipelineResult(issue_text=issue_text, trace=trace)
+    digest = issue_hash(issue_text)
+    result = PipelineResult(issue_text=issue_text, issue_hash=digest, trace=trace)
 
-    trace.record(PIPELINE_AGENT, "task_input", chars=len(issue_text), notes_in_store=len(store.active()))
+    trace.record(
+        PIPELINE_AGENT,
+        "task_input",
+        chars=len(issue_text),
+        issue_hash=digest,
+        notes_in_store=len(store.active()),
+    )
 
     result.subtasks = TriageClerk().run(issue_text, trace=trace)
 
@@ -120,6 +136,8 @@ def run_pipeline(
             trace=trace,
             cause=cause,
             fix=fix,
+            run_id=trace.run_id,
+            issue_hash=digest,
         )
         result.captured_note_id = note.id
 

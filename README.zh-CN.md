@@ -23,7 +23,7 @@ pip install -e .
 cogram-goai demo --auto-approve --trace run.jsonl
 cogram-goai demo --conflict --auto-approve --no-capture
 cogram-goai replay --trace run.jsonl
-cogram-goai verify-trace --trace run.jsonl
+cogram-goai verify-trace --trace run.jsonl --complete
 cogram-goai tools
 ```
 

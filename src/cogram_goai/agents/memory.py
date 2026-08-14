@@ -51,9 +51,32 @@ class KeywordMemoryAgent:
         trace: Optional[Any] = None,
         cause: str = "",
         fix: str = "",
+        run_id: str = "",
+        issue_hash: str = "",
     ) -> Note:
         cleaned = redact(text)
-        note = self.store.append(cleaned["text"], tags, cause=cause, fix=fix)
+        existing = self.store.find_duplicate(issue_hash, cause, fix)
+        if existing:
+            if trace is not None:
+                trace.record(
+                    self.name,
+                    "experience_capture",
+                    note_id=existing.id,
+                    tags=list(existing.tags),
+                    persisted=bool(self.store.path),
+                    redactions=cleaned["redactions"],
+                    deduped=True,
+                    issue_hash=issue_hash,
+                )
+            return existing
+        note = self.store.append(
+            cleaned["text"],
+            tags,
+            cause=cause,
+            fix=fix,
+            run_id=run_id,
+            issue_hash=issue_hash,
+        )
         if self.store.path:
             self.store.save()
         if trace is not None:
@@ -64,6 +87,8 @@ class KeywordMemoryAgent:
                 tags=list(note.tags),
                 persisted=bool(self.store.path),
                 redactions=cleaned["redactions"],
+                deduped=False,
+                issue_hash=issue_hash,
             )
         return note
 

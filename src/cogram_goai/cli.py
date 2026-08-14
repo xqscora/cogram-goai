@@ -181,6 +181,16 @@ def _cmd_verify_trace(args: argparse.Namespace) -> int:
     except TraceError as exc:
         print(exc)
         return 1
+    if args.complete:
+        errors = trace.verify_complete()
+        if errors:
+            print("incomplete: %s" % "; ".join(errors))
+            return 1
+        print(
+            "ok: %d event(s), hash chain intact, complete run, run_id=%s"
+            % (len(trace.events), trace.run_id)
+        )
+        return 0
     print("ok: %d event(s), hash chain intact, run_id=%s" % (len(trace.events), trace.run_id))
     return 0
 
@@ -273,6 +283,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     verify = sub.add_parser("verify-trace", help="check the hash chain on a saved JSONL trace")
     verify.add_argument("--trace", required=True)
+    verify.add_argument(
+        "--complete",
+        action="store_true",
+        help="also require task_input, decomposition, verification, and a gate event",
+    )
     verify.set_defaults(func=_cmd_verify_trace)
 
     return parser
