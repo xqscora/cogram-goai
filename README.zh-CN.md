@@ -7,7 +7,7 @@
 写回的笔记可以回滚，行还留着，审计链不断。
 
 这是 Cogram 在 GOAI 2026 Agent Infra 赛道的**公开切片**，不是产品本身。
-边界见 [docs/SCOPE.md](docs/SCOPE.md)。
+对应官网 **Direction 3（端到端研发协作）**。边界见 [docs/SCOPE.md](docs/SCOPE.md)。评分对照见 [docs/GOAI_2026.md](docs/GOAI_2026.md)。
 
 [English](README.md) · [架构](docs/ARCHITECTURE.md) · [Skill 契约](docs/SKILL_keyword_recall.md) · [GOAI 对照](docs/GOAI_2026.md)
 

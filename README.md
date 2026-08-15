@@ -20,13 +20,13 @@ product. See [docs/SCOPE.md](docs/SCOPE.md).
 GOAI Agent Infra asks for **at least three agents**, **reusable skills**,
 **context that can be audited**, and **approval / rollback / evidence**.
 
-| Handbook requirement | Where it is |
+| Official review dimension | Where it is |
 |---|---|
-| Multi-agent closed loop | A1 triage → A2 memory → A3 verifier → human gate |
-| Reusable skills, not one-shot scripts | five contracts in `cogram-goai tools` |
-| Context + execution evidence | cited `context` packet + hash-chained JSONL + evidence map |
-| Security / approval / rollback / audit | path guard, redact-on-capture, pending-if-no-approver, `rollback`, `verify-trace` |
-| Honest open-source slice | Apache-2.0, zero runtime deps |
+| Direction 3 · software incidents (25%) | same loop on any issue text; demo = upload timeout after second retry |
+| Multi-agent closed loop (25%) | A1 triage → A2 memory → A3 verifier → human gate |
+| Reusable skills (25%) | five contracts in `cogram-goai tools` |
+| Trace / approval / rollback (20%) | path guard, redact-on-capture, pending-if-no-approver, `rollback`, `verify-trace --complete` |
+| Open-source (5%) | Apache-2.0, zero runtime deps |
 
 It does **not** call a model, embed text, or sync to the cloud. Every score
 is token overlap plus a one-page synonym table you can read.
